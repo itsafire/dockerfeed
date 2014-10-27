@@ -11,7 +11,9 @@ additional paths into the docker build context.
 
 A build could look like this:
 
+```
 dockerfeed -d ../Dockerfile.special path/to/dockerimagesource | docker build -t myspecialimage -
+``` 
 
 ```
 usage: dockerfeed [-h] [-p PATH] [-d DOCKERFILE] context
