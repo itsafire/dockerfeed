@@ -1,0 +1,79 @@
+#!/usr/bin/env python
+
+"""
+   Copyright 2014 n@work Internet Informationssysteme GmbH, Germany
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+"""
+
+ 
+from tarfile import TarFile,TarInfo
+from cStringIO import StringIO
+import os, sys, argparse
+
+
+class DockerContextGenerator(object):
+    def __init__(self, context, dockerfile, filter_list, replacement_list):
+        self.context = context
+        self.filter_list = filter_list
+        self.replacement_list = replacement_list
+        self.dockerfile = dockerfile
+
+    def filter_func(self, info):
+        if os.path.relpath(info.name) in filter_list:
+            return None
+        else:
+            return info
+
+    def create_context(self):
+        stringfile = StringIO()
+        with TarFile.open(mode='w',fileobj=stringfile) as tarfile:
+            tarfile.add(self.context, arcname='.', filter=self.filter_func)
+            for src,dst in self.replacement_list:
+                tarfile.add(os.path.join(src,dst),arcname=os.path.join('.',dst))
+            if self.dockerfile:
+                tarfile.add(self.dockerfile, arcname='./Dockerfile')
+        stringfile.seek(0)
+        sys.stdout.write(stringfile.read())
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Replace Dockerfile and/or replace file path in context')
+    parser.add_argument('context', type=str, action='store', help='path to context')
+    parser.add_argument('-p', '--path', metavar='PATH', type=str, dest='paths', action='append',
+                        default=[], help='path to add/override in context. example: /path/to/./path_to_be_inserted')
+    parser.add_argument('-d', '--dockerfile', metavar='DOCKERFILE', type=str, dest='dockerfile', default=None,
+                        action='store', help='replacement dockerfile')
+    parsed = parser.parse_args()
+
+    filter_list = []
+    replacement_list = []
+    dockerfile = None
+
+    if parsed.dockerfile:
+        filter_list.append('Dockerfile')
+        dockerfile = parsed.dockerfile
+        if not os.path.isfile(dockerfile):
+            parser.error('Dockerfile is expected to be a plain file') 
+    for path in parsed.paths:
+        try:
+            (source,dest) = path.split('/./')
+        except:
+            parser.error('wrong path syntax')
+        filter_list.append(os.path.relpath(dest))
+        replacement_list.append((source,dest))
+    dcg = DockerContextGenerator(os.path.relpath(parsed.context), dockerfile, filter_list, replacement_list)
+    dcg.create_context()
+
+
+
+
