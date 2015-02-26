@@ -41,7 +41,12 @@ class DockerContextGenerator(object):
             tarfile.add(self.context, arcname='.', filter=self.filter_func)
             for src,dst in self.replacement_list:
                 tarfile.add(os.path.join(src,dst),arcname=os.path.join('.',dst))
-            if self.dockerfile:
+            if self.dockerfile == '-':
+                tarinfo = TarInfo('./Dockerfile')
+                data = sys.stdin.read()
+                tarinfo.size = len(data)
+                tarfile.addfile(tarinfo, StringIO(data))
+            elif self.dockerfile:
                 tarfile.add(self.dockerfile, arcname='./Dockerfile')
         stringfile.seek(0)
         sys.stdout.write(stringfile.read())
@@ -62,7 +67,7 @@ if __name__ == '__main__':
     if parsed.dockerfile:
         filter_list.append('Dockerfile')
         dockerfile = parsed.dockerfile
-        if not os.path.isfile(dockerfile):
+        if not os.path.isfile(dockerfile) and dockerfile != '-':
             parser.error('Dockerfile is expected to be a plain file') 
     for path in parsed.paths:
         try:
